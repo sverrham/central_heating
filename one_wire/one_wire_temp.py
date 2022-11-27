@@ -80,5 +80,5 @@ while True:
             logging.info(u"Device id '%s' reads %.3f +/- 0.5 °C" % (t, temp_readings[t]['temp_c']))
             mqtt.send(t, temp_readings[t]['temp_c'])
 
-        time.sleep(1.0)
+        time.sleep(60.0)
 
