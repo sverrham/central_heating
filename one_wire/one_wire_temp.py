@@ -10,12 +10,13 @@ import RPi.GPIO as GPIO
 import paho.mqtt.client as mqttClient
 import json
 
-#  Set Pull-up mode on GPIO14 first.
+#  Set Pull-up mode on GPIO4 first.
 GPIO_PIN_NUMBER=4
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(GPIO_PIN_NUMBER, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-id_to_name = {'28-3c01d075ff96':"supply-temp", '28-xxx':"return-temp", '28-xx':"tank-temp"}
+id_to_name = {'28-3c01d075ff96': "tank-temp", '28-3c01e076a286': "return-temp", '28-3c01d07512ff': "room-temp", '28-3c01d0751560': "flow-temp"}
+id_calib = {'28-3c01d075ff96': -0.3, '28-3c01e076a286': 0.15, '28-3c01d07512ff': -0.15, '28-3c01d0751560': 0.5}
 
 def ds18b20_read_sensors():
     rtn = {}
@@ -60,16 +61,19 @@ class MqttSender:
     def send(self, id, value):
         if self.connected:
             name = id
+            temp = value
             if id in id_to_name:
                 name = id_to_name[id]
-            data = json.dumps({'id':id, 'name':name, 'value':value})
+            if id in id_calib:
+                temp = value+id_calib[id]
+            data = json.dumps({'id':id, 'name':name, 'value':temp, 'raw':value})
             logging.debug(f'sending: temperature/water/{id} {data}')
             self.client.publish(f'temperature/water/{id}', data)
         else:
             logging.error("Not connected to mqtt server")
 
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 mqtt = MqttSender()
 
 
@@ -77,8 +81,9 @@ while True:
     temp_readings = ds18b20_read_sensors()
     for t in temp_readings:
         if 'error' not in temp_readings[t]:
-            logging.info(u"Device id '%s' reads %.3f +/- 0.5 °C" % (t, temp_readings[t]['temp_c']))
-            mqtt.send(t, temp_readings[t]['temp_c'])
+            temp = temp_readings[t]['temp_c']
+            logging.info(u"Device id '%s' reads %.3f +/- 0.5 °C" % (t, temp))
+            mqtt.send(t, temp)
 
-        time.sleep(60.0)
+    time.sleep(60.0)
 
